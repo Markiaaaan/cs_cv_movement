@@ -31,14 +31,20 @@ class Calibrator:
     """Collect frames of the neutral pose and measure the body.
 
     Restarts if the person moves too much, so the resting values are clean.
-    Result: dict with shoulder_width, torso_length, hip_y, shoulder_mid (x, y).
+    Result: features.rest_values() of the average pose.
     """
 
     KEY_POINTS = (F.L_SHOULDER, F.R_SHOULDER, F.L_HIP, F.R_HIP)
+    # Everything the gestures need must be seen during calibration.
+    REQUIRED = {
+        "shoulders": (F.L_SHOULDER, F.R_SHOULDER), "hips": (F.L_HIP, F.R_HIP),
+        "knees": (F.L_KNEE, F.R_KNEE), "head": (F.NOSE, F.L_EAR, F.R_EAR),
+    }
 
     def __init__(self, seconds, max_jitter, min_vis):
         self.seconds, self.max_jitter, self.min_vis = seconds, max_jitter, min_vis
         self.result = None
+        self.missing = []  # body parts not seen in the last frame, for the HUD
         self.restart()
 
     def restart(self):
@@ -60,7 +66,12 @@ class Calibrator:
     def update(self, lm, t):
         if self.done:
             return self.result
-        if lm is None or not all(F.visible(lm, i, self.min_vis) for i in self.KEY_POINTS):
+        if lm is None:
+            self.missing = ["person"]
+        else:
+            self.missing = [name for name, idxs in self.REQUIRED.items()
+                            if not F.all_visible(lm, idxs, self.min_vis)]
+        if self.missing:
             self.restart()
             return None
         if self._frames:
@@ -72,13 +83,7 @@ class Calibrator:
             self._t0 = t
         self._frames.append(lm.copy())
         if t - self._t0 >= self.seconds and len(self._frames) >= 5:
-            mean = np.mean(self._frames, axis=0)
-            self.result = {
-                "shoulder_width": F.shoulder_width(mean),
-                "torso_length": F.torso_length(mean),
-                "hip_y": float(F.midpoint(mean, F.L_HIP, F.R_HIP)[1]),
-                "shoulder_mid": tuple(F.midpoint(mean, F.L_SHOULDER, F.R_SHOULDER)),
-            }
+            self.result = F.rest_values(np.mean(self._frames, axis=0))
         return self.result
 
 

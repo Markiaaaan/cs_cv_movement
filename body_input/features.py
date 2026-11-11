@@ -10,7 +10,9 @@ import numpy as np
 
 # MediaPipe Pose landmark indices we use.
 NOSE = 0
+L_EAR, R_EAR = 7, 8
 L_SHOULDER, R_SHOULDER = 11, 12
+L_ELBOW, R_ELBOW = 13, 14
 L_WRIST, R_WRIST = 15, 16
 L_HIP, R_HIP = 23, 24
 L_KNEE, R_KNEE = 25, 26
@@ -32,6 +34,87 @@ def shoulder_width(lm):
 def torso_length(lm):
     """Shoulder midpoint to hip midpoint."""
     return float(np.linalg.norm(midpoint(lm, L_SHOULDER, R_SHOULDER) - midpoint(lm, L_HIP, R_HIP)))
+
+
+# --- Per-frame body measures ------------------------------------------------
+# None of these use MediaPipe's left/right labels for direction, because on a
+# mirrored image those labels are easy to get backwards. They use image
+# positions or symmetric pairs instead.
+
+def all_visible(lm, idxs, min_vis):
+    return all(lm[i, 3] >= min_vis for i in idxs)
+
+
+def knee_diff(lm):
+    """Height difference between the two knees, in torso lengths.
+
+    Lifting one knee makes this swing to + or -. A squat moves both knees the
+    same way, so it barely changes this number (that is why we use it).
+    """
+    return float((lm[R_KNEE, 1] - lm[L_KNEE, 1]) / torso_length(lm))
+
+
+def lean(lm):
+    """Sideways torso lean: shoulder centre vs hip centre, in shoulder widths.
+
+    + means leaning toward image right, which is your right on a mirrored image.
+    """
+    sx = midpoint(lm, L_SHOULDER, R_SHOULDER)[0]
+    hx = midpoint(lm, L_HIP, R_HIP)[0]
+    return float((sx - hx) / shoulder_width(lm))
+
+
+def hip_drop(lm, rest_hip_y, rest_torso):
+    """How far the hips are below their calibrated height, in torso lengths."""
+    return float((midpoint(lm, L_HIP, R_HIP)[1] - rest_hip_y) / rest_torso)
+
+
+def arms_up(lm):
+    """How far the LOWER wrist is above the nose, in torso lengths (+ = above)."""
+    lowest_wrist = max(lm[L_WRIST, 1], lm[R_WRIST, 1])
+    return float((lm[NOSE, 1] - lowest_wrist) / torso_length(lm))
+
+
+def hands_on_hips(lm, wrist_max):
+    """Elbow span in shoulder widths when both wrists are near the hips, else 0.
+
+    Relaxed hanging arms also put the wrists near the hips, so the elbows
+    sticking out sideways is what really tells "hands on hips" apart.
+    """
+    sw = shoulder_width(lm)
+    hips = lm[[L_HIP, R_HIP], :2]
+    for w in (L_WRIST, R_WRIST):
+        if np.min(np.linalg.norm(hips - lm[w, :2], axis=1)) / sw > wrist_max:
+            return 0.0
+    return float(abs(lm[L_ELBOW, 0] - lm[R_ELBOW, 0]) / sw)
+
+
+def head_yaw(lm):
+    """Nose left/right of the ear centre, in ear distances (+ = turned to image right)."""
+    ear_mid = midpoint(lm, L_EAR, R_EAR)
+    ear_dist = float(np.linalg.norm(lm[L_EAR, :2] - lm[R_EAR, :2]))
+    return float((lm[NOSE, 0] - ear_mid[0]) / ear_dist)
+
+
+def head_pitch(lm):
+    """Nose below the ear line, in ear distances (+ = looking down)."""
+    ear_mid = midpoint(lm, L_EAR, R_EAR)
+    ear_dist = float(np.linalg.norm(lm[L_EAR, :2] - lm[R_EAR, :2]))
+    return float((lm[NOSE, 1] - ear_mid[1]) / ear_dist)
+
+
+def rest_values(lm):
+    """Neutral-pose values that the gestures measure against."""
+    return {
+        "shoulder_width": shoulder_width(lm),
+        "torso_length": torso_length(lm),
+        "hip_y": float(midpoint(lm, L_HIP, R_HIP)[1]),
+        "shoulder_mid": tuple(float(v) for v in midpoint(lm, L_SHOULDER, R_SHOULDER)),
+        "knee_diff": knee_diff(lm),
+        "lean": lean(lm),
+        "head_yaw": head_yaw(lm),
+        "head_pitch": head_pitch(lm),
+    }
 
 
 class OneEuroFilter:

@@ -42,3 +42,39 @@ class PoseDetector:
 
     def close(self):
         self._landmarker.close()
+
+
+class HandDetector:
+    """MediaPipe Hand Landmarker, up to two hands, VIDEO mode."""
+
+    def __init__(self, model_path, min_detection=0.5, min_tracking=0.5):
+        import mediapipe as mp
+        from mediapipe.tasks.python import BaseOptions, vision
+
+        self._mp = mp
+        options = vision.HandLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=model_path),
+            running_mode=vision.RunningMode.VIDEO,
+            num_hands=2,
+            min_hand_detection_confidence=min_detection,
+            min_tracking_confidence=min_tracking,
+        )
+        self._landmarker = vision.HandLandmarker.create_from_options(options)
+        self._last_ts = -1
+        self.last_ms = 0.0
+
+    def detect(self, frame_rgb, t_seconds):
+        """Returns a list of (21, 3) arrays [x, y, z] (0, 1 or 2 hands)."""
+        ts = int(t_seconds * 1000)
+        if ts <= self._last_ts:
+            ts = self._last_ts + 1
+        self._last_ts = ts
+        image = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=frame_rgb)
+        start = time.perf_counter()
+        result = self._landmarker.detect_for_video(image, ts)
+        self.last_ms = (time.perf_counter() - start) * 1000
+        return [np.array([[p.x, p.y, p.z] for p in hand], dtype=np.float32)
+                for hand in result.hand_landmarks]
+
+    def close(self):
+        self._landmarker.close()

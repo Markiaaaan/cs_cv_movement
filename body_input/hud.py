@@ -22,6 +22,12 @@ def draw_skeleton(frame, lm, min_vis):
             cv2.circle(frame, (int(x * w), int(y * h)), 3, (0, 200, 255), -1)
 
 
+def draw_hand(frame, h):
+    hgt, w = frame.shape[:2]
+    for x, y, _ in h:
+        cv2.circle(frame, (int(x * w), int(y * hgt)), 2, (255, 0, 255), -1)
+
+
 def draw_text(frame, lines):
     y = 22
     for text, color in lines:

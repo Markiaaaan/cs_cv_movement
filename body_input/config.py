@@ -66,6 +66,30 @@ LOOK_CURVE = 1.5           # >1 = finer control near the dead zone
 LOOK_MAX_DT = 0.1          # cap frame gaps so a stall cannot cause a big jump
 LOOK_INVERT_PITCH = False
 
+# --- Hands ------------------------------------------------------------------
+USE_HANDS = True        # False = body only (faster; no shoot/reload/switch)
+HAND_MIN_DETECTION_CONFIDENCE = 0.5
+HAND_MIN_TRACKING_CONFIDENCE = 0.5
+FINGER_EXT_RATIO = 1.15   # tip farther than this * PIP joint from wrist = straight
+THUMB_EXT_RATIO = 1.3     # thumb tip vs thumb base, measured from pinky knuckle
+FIRE_MIN_RAISE = 0.25     # right wrist this many torso lengths above hips to fire
+FIRE_ON_FRAMES = 2        # fist frames needed to start firing
+FIRE_OFF_FRAMES = 3       # non-fist frames needed to stop (short dropouts ok)
+SIGN_HOLD_S = 0.20        # a hand sign must be held this long to trigger once
+BUY_HOLD_S = 0.40         # buy pose held this long (longer: rare and costly)
+
+# Left hand, raised above the shoulder: sign -> action.
+LEFT_SIGNS = {
+    "one": "slot1",       # primary
+    "two": "slot2",       # pistol
+    "three": "slot3",     # knife
+    "four": "slot4",      # grenade
+    "thumb": "last_weapon",
+    "fist": "reload",
+    "palm": "scope",
+}
+RIGHT_RAISED_SIGNS = {"palm": "use"}  # right open palm raised = use (E)
+
 # --- Mouse ------------------------------------------------------------------
 MOUSE_SENSITIVITY = 1.0  # multiplies every relative mouse move
 

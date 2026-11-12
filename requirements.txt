@@ -1,0 +1,6 @@
+mediapipe
+opencv-python
+numpy
+pynput
+sounddevice
+pytest
